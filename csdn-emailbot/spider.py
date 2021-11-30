@@ -1,6 +1,7 @@
+#!/bin/python
+#Coding="utf-8"
 import re
 import requests
-import json
 
 
 def PoJie(headers):
