@@ -1,113 +1,40 @@
-#!/bin/python
-#Coding="utf-8"
-
-import sys
+import re
 import requests
-from bs4 import BeautifulSoup
 import json
-import smtplib
-from email.mime.text import MIMEText
-from email.header import Header
 
 
-# 爬取访问量、排名等信息
-def getResult(CSDN_ID):
-    url = "https://blog.csdn.net/" + CSDN_ID
-    headers = {
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.70 Safari/537.36",
-        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3",
-        "accept-language": "zh-CN,zh;q=0.9"
-    }
-
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        result = {
-            "nick_name": "",
-            "blog_title": "",
-            "profile": {}
+def PoJie(headers):
+    # 提取主页
+    session = requests.session()
+    qdurl = 'https://www.52pojie.cn/home.php?mod=task&do=draw&id=2'
+    qd = session.post(qdurl, headers=headers)
+    soup=session.post(url="https://www.52pojie.cn/forum.php", headers=headers).text
+    if  re.findall(r"(wbs.png)",str(soup))[0] == "wbs.png": 
+        waxx="吾爱打卡成功"
+    else:
+        waxx="吾爱打卡失败"
+    return waxx
+headers = {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.55 Safari/537.36 Edg/96.0.1054.34',
+        'cookie':'KF4=Gzx4tU; htVC_2132_saltkey=mo7RIh5v; htVC_2132_lastvisit=1638112294; htVC_2132_seccodecS=5454231.03a35da74d1a4cd661; htVC_2132_seccodecSxV4=5454232.b4a53c9065defbf2a3; htVC_2132_ulastactivity=1638115902%7C0; htVC_2132_auth=69c5Wtp2KQR4Kl2KSgFKLaKoehnjFVMeoyFByG6mTICSFUZs%2FMamPyWMUIYYtaJ7X19%2FKZI2bIQg4OG0FC%2FpfKmuZV4; htVC_2132_lip=112.49.76.86%2C1638115902; htVC_2132_sid=0; htVC_2132_connect_is_bind=1; htVC_2132_nofavfid=1; wzws_sid=b8faeb71d36f40743f54e68be0c95bd7deb9ecbf7ee9d07c90410adfecb50326190b58d15d033a0c393042f20dab1d358765ff00c09f87908e774aaa4af183ff952eee725c89e93372a4659b531f755e; htVC_2132_onlineusernum=20021; htVC_2132_checkpm=1; htVC_2132_lastact=1638116295%09home.php%09spacecp; htVC_2132_lastcheckfeed=212945%7C1638116295,'
+        'ContentType': 'text/html;charset=gbk'
         }
 
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        # 爬取asideProfile信息
-        nick_name = soup.find("a", id="uid").get("title")
-        blog_title = soup.find("a", attrs={"href": url}).get_text().strip()
-        result["nick_name"] = nick_name
-        result["blog_title"] = blog_title
-
-        profile = {}
-        profile_data = []
-        data_info = soup.find("div", attrs={"class": "data-info d-flex item-tiling"})
-        data = data_info.find_all("dl", attrs={"class": "text-center"})
-        for num in data:
-            profile_data.append(num.attrs["title"])
-
-        grade_info = soup.find("div", attrs={"class": "grade-box clearfix"}).contents
-        point = grade_info[5].find("dd").attrs["title"]
-        week_rank = grade_info[3].attrs["title"]
-        total_rank = grade_info[7].attrs["title"]
-
-        profile["original"] = profile_data[0]
-        profile["fans"] = profile_data[1]
-        profile["like"] = profile_data[2]
-        profile["comment"] = profile_data[3]
-        profile["read"] = profile_data[4]
-        profile["point"] = point
-        profile["week_rank"] = week_rank
-        profile["total_rank"] = total_rank
-        result["profile"] = profile
-
-        return result
+waxx=PoJie(headers)
 
 
-# 生成信息
-def formatMessage(result):
-    message = ""
-    call = "亲爱的 " + result["nick_name"] + "，您的 CSDN profile 到啦\n\n"
-    profile = result["profile"]
-    original = "原创文章数目： " + profile["original"] + "\n"
-    fans = "粉丝： " + profile["fans"] + "\n"
-    like = "获赞： " + profile["like"] + "\n"
-    comment = "评论： " + profile["comment"] + "\n"
-    read = "访问量： " + profile["read"] + "\n"
-    point = "积分： " + profile["point"] + "\n"
-    week_rank = "周排名： " + profile["week_rank"] + "\n"
-    total_rank = "总排名： " + profile["total_rank"]
 
-    message += call + original + fans + like + comment + read + point + week_rank + total_rank
-    return message
+# 消息推送
+content =waxx
+pdata ={
+	"token": "6d0fa8fdf6014c96aef41245e39015dc",
+    "title":"多网站打卡",
+	"content":"\n".join(content),
+	"template": "html"
+}
+requests.post(url="http://pushplus.hxtrip.com/send",data=pdata)
 
 
-# 发送邮件
-def sendEmail(content):
-    message = MIMEText(content, 'plain', 'utf-8')
-    message['From'] = "GitHub Actions<" + sender + ">"
-    message['To'] = "<" + receiver + ">"
-
-    subject = "CSDN Report"
-    message['Subject'] = Header(subject, 'utf-8')
-
-    try:
-        smtpObj = smtplib.SMTP_SSL(mail_host, mail_port)
-        smtpObj.login(mail_user, mail_password)
-        smtpObj.sendmail(sender, receiver, message.as_string())
-        print("邮件发送成功")
-
-    except smtplib.SMTPException:
-        print("Error: 无法发送邮件")
 
 
-# 保存email内容
-def saveEmail(email_path, message):
-    with open(email_path, 'w', encoding="utf-8") as email:
-        email.writelines(message)
 
-
-if __name__ == "__main__":
-
-    CSDN_ID = sys.argv[1]
-
-    res = getResult(CSDN_ID)
-    message = formatMessage(res)
-    email_path = "email.txt"
-    saveEmail(email_path, message)
